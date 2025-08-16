@@ -7,8 +7,7 @@ import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { useFinanceData } from "@/hooks/use-finance-data"
 import { formatCurrency, formatDate, getMonthOptions } from "@/lib/finance-utils"
-import { TransactionModal } from "@/components/transaction-modal"
-import { TrendingUp, TrendingDown, PiggyBank, Target, Plus, Trash2 } from "lucide-react"
+import { TrendingUp, TrendingDown, PiggyBank, Target, Trash2, Filter } from "lucide-react"
 
 const transactionIcons = {
   income: TrendingUp,
@@ -32,13 +31,30 @@ const transactionLabels = {
 }
 
 export function TransactionsList() {
-  const { getMonthlyData, deleteTransaction, getCurrentMonth } = useFinanceData()
+  const { getMonthlyData, getAnnualData, deleteTransaction, getCurrentMonth, getCurrentYear } = useFinanceData()
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
+  const [selectedYear, setSelectedYear] = useState(getCurrentYear())
+  const [view, setView] = useState<"monthly" | "annual">("monthly")
+  const [typeFilter, setTypeFilter] = useState<string>("all")
 
   const monthlyData = getMonthlyData(selectedMonth)
+  const annualData = getAnnualData(selectedYear)
   const monthOptions = getMonthOptions()
 
-  const sortedTransactions = monthlyData.transactions.sort(
+  // Get available years from transactions
+  const availableYears = Array.from(
+    new Set(
+      (view === "monthly" ? monthlyData.transactions : annualData.transactions).map((t) =>
+        new Date(t.date).getFullYear(),
+      ),
+    ),
+  ).sort((a, b) => b - a)
+
+  // Filter transactions by type
+  const transactions = view === "monthly" ? monthlyData.transactions : annualData.transactions
+  const filteredTransactions = typeFilter === "all" ? transactions : transactions.filter((t) => t.type === typeFilter)
+
+  const sortedTransactions = filteredTransactions.sort(
     (a, b) => new Date(b.date).getTime() - new Date(a.date).getTime(),
   )
 
@@ -49,74 +65,95 @@ export function TransactionsList() {
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
-        <h2 className="text-xl font-bold">Transações</h2>
-        <TransactionModal>
-          <Button size="sm">
-            <Plus className="h-4 w-4 mr-2" />
-            Adicionar
-          </Button>
-        </TransactionModal>
+    <div className="space-y-4">
+      {/* View Toggle */}
+      <div className="flex gap-2">
+        <Button
+          variant={view === "monthly" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setView("monthly")}
+          className="flex-1"
+        >
+          Mensal
+        </Button>
+        <Button
+          variant={view === "annual" ? "default" : "outline"}
+          size="sm"
+          onClick={() => setView("annual")}
+          className="flex-1"
+        >
+          Anual
+        </Button>
       </div>
 
-      {/* Month Selector */}
-      <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="Selecione o mês" />
-        </SelectTrigger>
-        <SelectContent>
-          {monthOptions.map((option) => (
-            <SelectItem key={option.value} value={option.value}>
-              {option.label}
-            </SelectItem>
-          ))}
-        </SelectContent>
-      </Select>
+      {/* Period Selector */}
+      {view === "monthly" ? (
+        <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Selecione o mês" />
+          </SelectTrigger>
+          <SelectContent>
+            {monthOptions.map((option) => (
+              <SelectItem key={option.value} value={option.value}>
+                {option.label}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      ) : (
+        <Select value={selectedYear.toString()} onValueChange={(value) => setSelectedYear(Number.parseInt(value))}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Selecione o ano" />
+          </SelectTrigger>
+          <SelectContent>
+            {availableYears.map((year) => (
+              <SelectItem key={year} value={year.toString()}>
+                {year}
+              </SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      )}
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-2 gap-4">
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Total de Transações</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-2xl font-bold">{monthlyData.transactions.length}</p>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="pb-2">
-            <CardTitle className="text-sm text-muted-foreground">Saldo do Mês</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p
-              className={`text-2xl font-bold ${
-                monthlyData.totalIncome - monthlyData.totalExpenses >= 0 ? "text-chart-3" : "text-destructive"
-              }`}
-            >
-              {formatCurrency(monthlyData.totalIncome - monthlyData.totalExpenses)}
-            </p>
-          </CardContent>
-        </Card>
+      {/* Type Filter */}
+      <div className="flex items-center gap-2">
+        <Filter className="h-4 w-4 text-muted-foreground" />
+        <Select value={typeFilter} onValueChange={setTypeFilter}>
+          <SelectTrigger className="w-full">
+            <SelectValue placeholder="Filtrar por tipo" />
+          </SelectTrigger>
+          <SelectContent>
+            <SelectItem value="all">Todos os tipos</SelectItem>
+            <SelectItem value="income">Receitas</SelectItem>
+            <SelectItem value="expense">Gastos</SelectItem>
+            <SelectItem value="savings">Poupança</SelectItem>
+            <SelectItem value="investment">Investimentos</SelectItem>
+          </SelectContent>
+        </Select>
       </div>
 
       {/* Transactions List */}
       <Card>
         <CardHeader>
-          <CardTitle className="text-lg">Todas as Transações</CardTitle>
+          <CardTitle className="text-lg flex items-center justify-between">
+            <span>
+              {typeFilter === "all"
+                ? "Todas as Transações"
+                : `${transactionLabels[typeFilter as keyof typeof transactionLabels]}`}
+            </span>
+            <Badge variant="secondary" className="text-xs">
+              {filteredTransactions.length} {filteredTransactions.length === 1 ? "transação" : "transações"}
+            </Badge>
+          </CardTitle>
         </CardHeader>
         <CardContent>
           {sortedTransactions.length === 0 ? (
             <div className="text-center py-8">
-              <p className="text-muted-foreground mb-4">Nenhuma transação registrada neste mês</p>
-              <TransactionModal>
-                <Button>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Adicionar primeira transação
-                </Button>
-              </TransactionModal>
+              <p className="text-muted-foreground mb-4">
+                {typeFilter === "all"
+                  ? `Nenhuma transação registrada ${view === "monthly" ? "neste mês" : "neste ano"}`
+                  : `Nenhuma transação do tipo "${transactionLabels[typeFilter as keyof typeof transactionLabels]}" encontrada`}
+              </p>
             </div>
           ) : (
             <div className="space-y-3">
@@ -151,7 +188,7 @@ export function TransactionsList() {
                     <div className="flex items-center gap-3">
                       <div className="text-right">
                         <p className={`font-semibold ${colorClass}`}>
-                          {transaction.type === "expense" ? "-" : "+"}
+                          {transaction.type === "income" ? "+" : "-"}
                           {formatCurrency(transaction.amount)}
                         </p>
                       </div>

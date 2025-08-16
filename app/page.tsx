@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useFinanceData } from "@/hooks/use-finance-data"
 import { formatCurrency, formatMonthYear, getMonthOptions } from "@/lib/finance-utils"
 import { GoalsModal } from "@/components/goals-modal"
@@ -21,6 +21,7 @@ function FinanceDashboard() {
 
   const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
   const [view, setView] = useState<"monthly" | "annual">("monthly")
+  const [activeTab, setActiveTab] = useState("dashboard")
 
   if (isLoading) {
     return (
@@ -38,7 +39,8 @@ function FinanceDashboard() {
   const yearGoals = getGoalsForYear(currentYear)
   const monthOptions = getMonthOptions()
 
-  const balance = monthlyData.totalIncome - monthlyData.totalExpenses
+  const balance =
+    monthlyData.totalIncome - monthlyData.totalExpenses - monthlyData.totalSavings - monthlyData.totalInvestments
   const isPositiveBalance = balance >= 0
 
   // Calculate progress percentages
@@ -53,8 +55,7 @@ function FinanceDashboard() {
         <div className="max-w-md mx-auto">
           <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-4 text-center">Controle Financeiro</h1>
 
-          {/* Main Navigation Tabs */}
-          <Tabs defaultValue="dashboard" className="w-full">
+          <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
             <TabsList className="grid w-full grid-cols-3 h-12">
               <TabsTrigger
                 value="dashboard"
@@ -82,59 +83,52 @@ function FinanceDashboard() {
               </TabsTrigger>
             </TabsList>
 
-            <TabsContent value="dashboard" className="mt-4">
-              {/* View Toggle */}
-              <div className="flex gap-2 mb-4">
-                <Button
-                  variant={view === "monthly" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setView("monthly")}
-                  className="flex-1 h-10"
-                >
-                  Mensal
-                </Button>
-                <Button
-                  variant={view === "annual" ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setView("annual")}
-                  className="flex-1 h-10"
-                >
-                  Anual
-                </Button>
+            {activeTab === "dashboard" && (
+              <div className="mt-4">
+                {/* View Toggle */}
+                <div className="flex gap-2 mb-4">
+                  <Button
+                    variant={view === "monthly" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setView("monthly")}
+                    className="flex-1 h-10"
+                  >
+                    Mensal
+                  </Button>
+                  <Button
+                    variant={view === "annual" ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => setView("annual")}
+                    className="flex-1 h-10"
+                  >
+                    Anual
+                  </Button>
+                </div>
+
+                {/* Month Selector */}
+                {view === "monthly" && (
+                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                    <SelectTrigger className="w-full h-12">
+                      <SelectValue placeholder="Selecione o mês" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {monthOptions.map((option) => (
+                        <SelectItem key={option.value} value={option.value}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
               </div>
-
-              {/* Month Selector */}
-              {view === "monthly" && (
-                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                  <SelectTrigger className="w-full h-12">
-                    <SelectValue placeholder="Selecione o mês" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {monthOptions.map((option) => (
-                      <SelectItem key={option.value} value={option.value}>
-                        {option.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              )}
-            </TabsContent>
-
-            <TabsContent value="transactions" className="mt-4">
-              {/* Transactions content will be rendered below */}
-            </TabsContent>
-
-            <TabsContent value="annual" className="mt-4">
-              {/* Annual content will be rendered below */}
-            </TabsContent>
+            )}
           </Tabs>
         </div>
       </div>
 
-      {/* Main Content */}
       <div className="max-w-md mx-auto px-4 py-4 pb-24">
-        <Tabs defaultValue="dashboard" className="w-full">
-          <TabsContent value="dashboard" className="space-y-4">
+        {activeTab === "dashboard" && (
+          <div className="space-y-4">
             {view === "monthly" ? (
               <>
                 {/* Balance Card */}
@@ -142,7 +136,7 @@ function FinanceDashboard() {
                   <CardHeader className="pb-3">
                     <CardTitle className="text-lg flex items-center gap-2">
                       <DollarSign className="h-5 w-5" />
-                      Saldo do Mês
+                      Saldo Líquido do Mês
                     </CardTitle>
                   </CardHeader>
                   <CardContent>
@@ -157,6 +151,7 @@ function FinanceDashboard() {
                       )}
                     </div>
                     <p className="text-sm text-muted-foreground mt-1">{formatMonthYear(selectedMonth)}</p>
+                    <p className="text-xs text-muted-foreground mt-1">Receitas - Gastos - Poupança - Investimentos</p>
                   </CardContent>
                 </Card>
 
@@ -286,7 +281,7 @@ function FinanceDashboard() {
                                           : "text-chart-4"
                                   }`}
                                 >
-                                  {transaction.type === "expense" ? "-" : "+"}
+                                  {transaction.type === "income" ? "+" : "-"}
                                   {formatCurrency(transaction.amount)}
                                 </p>
                                 <Badge variant="outline" className="text-xs">
@@ -338,16 +333,11 @@ function FinanceDashboard() {
                 </CardContent>
               </Card>
             )}
-          </TabsContent>
+          </div>
+        )}
 
-          <TabsContent value="transactions" className="space-y-4">
-            <TransactionsList />
-          </TabsContent>
-
-          <TabsContent value="annual" className="space-y-4">
-            <AnnualView />
-          </TabsContent>
-        </Tabs>
+        {activeTab === "transactions" && <TransactionsList />}
+        {activeTab === "annual" && <AnnualView />}
       </div>
 
       <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">

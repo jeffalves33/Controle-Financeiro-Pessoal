@@ -260,6 +260,60 @@ export function useFinanceData() {
     }
   }
 
+  const getAnnualData = (year: number) => {
+    const yearTransactions = data.transactions.filter((t) => t.date.startsWith(year.toString()))
+
+    const totals = yearTransactions.reduce(
+      (acc, transaction) => {
+        switch (transaction.type) {
+          case "income":
+            acc.totalIncome += transaction.amount
+            break
+          case "expense":
+            acc.totalExpenses += transaction.amount
+            break
+          case "savings":
+            acc.totalSavings += transaction.amount
+            break
+          case "investment":
+            acc.totalInvestments += transaction.amount
+            break
+        }
+        return acc
+      },
+      {
+        totalIncome: 0,
+        totalExpenses: 0,
+        totalSavings: 0,
+        totalInvestments: 0,
+      },
+    )
+
+    const netBalance = totals.totalIncome - totals.totalExpenses - totals.totalSavings - totals.totalInvestments
+
+    return {
+      year,
+      transactions: yearTransactions,
+      ...totals,
+      netBalance,
+    }
+  }
+
+  const getMonthlyBreakdown = (year: number) => {
+    const months = []
+    for (let month = 1; month <= 12; month++) {
+      const monthStr = `${year}-${String(month).padStart(2, "0")}`
+      const monthData = getMonthlyData(monthStr)
+      const netBalance =
+        monthData.totalIncome - monthData.totalExpenses - monthData.totalSavings - monthData.totalInvestments
+      months.push({
+        ...monthData,
+        netBalance,
+      })
+    }
+    return months
+  }
+
   const getCurrentMonth = (): string => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
@@ -281,5 +335,7 @@ export function useFinanceData() {
     getMonthlyData,
     getCurrentMonth,
     getCurrentYear,
+    getAnnualData,
+    getMonthlyBreakdown,
   }
 }

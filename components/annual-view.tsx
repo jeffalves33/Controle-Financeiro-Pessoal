@@ -17,10 +17,11 @@ interface MonthlyBreakdown {
   totalSavings: number
   totalInvestments: number
   balance: number
+  netBalance: number
 }
 
 export function AnnualView() {
-  const { data, getGoalsForYear, getCurrentYear } = useFinanceData()
+  const { data, getGoalsForYear, getCurrentYear, getAnnualData, getMonthlyBreakdown } = useFinanceData()
   const [selectedYear, setSelectedYear] = useState(getCurrentYear())
 
   // Get all available years from transactions
@@ -32,85 +33,25 @@ export function AnnualView() {
     availableYears.push(getCurrentYear())
   }
 
-  // Calculate annual totals
-  const yearTransactions = data.transactions.filter((t) => new Date(t.date).getFullYear() === selectedYear)
-
-  const annualTotals = yearTransactions.reduce(
-    (acc, transaction) => {
-      switch (transaction.type) {
-        case "income":
-          acc.totalIncome += transaction.amount
-          break
-        case "expense":
-          acc.totalExpenses += transaction.amount
-          break
-        case "savings":
-          acc.totalSavings += transaction.amount
-          break
-        case "investment":
-          acc.totalInvestments += transaction.amount
-          break
-      }
-      return acc
-    },
-    {
-      totalIncome: 0,
-      totalExpenses: 0,
-      totalSavings: 0,
-      totalInvestments: 0,
-    },
-  )
-
-  const annualBalance = annualTotals.totalIncome - annualTotals.totalExpenses
+  const annualData = getAnnualData(selectedYear)
   const yearGoals = getGoalsForYear(selectedYear)
 
-  // Calculate monthly breakdown
-  const monthlyBreakdown: MonthlyBreakdown[] = []
-  for (let month = 0; month < 12; month++) {
-    const monthString = `${selectedYear}-${String(month + 1).padStart(2, "0")}`
-    const monthTransactions = yearTransactions.filter((t) => t.date.startsWith(monthString))
-
-    const monthTotals = monthTransactions.reduce(
-      (acc, transaction) => {
-        switch (transaction.type) {
-          case "income":
-            acc.totalIncome += transaction.amount
-            break
-          case "expense":
-            acc.totalExpenses += transaction.amount
-            break
-          case "savings":
-            acc.totalSavings += transaction.amount
-            break
-          case "investment":
-            acc.totalInvestments += transaction.amount
-            break
-        }
-        return acc
-      },
-      {
-        totalIncome: 0,
-        totalExpenses: 0,
-        totalSavings: 0,
-        totalInvestments: 0,
-      },
+  const monthlyBreakdown: MonthlyBreakdown[] = getMonthlyBreakdown(selectedYear).map((month) => {
+    const monthName = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(
+      new Date(selectedYear, Number.parseInt(month.month.split("-")[1]) - 1),
     )
-
-    const monthName = new Intl.DateTimeFormat("pt-BR", { month: "short" }).format(new Date(selectedYear, month))
-
-    monthlyBreakdown.push({
-      month: monthString,
+    return {
+      ...month,
       monthName: monthName.charAt(0).toUpperCase() + monthName.slice(1),
-      ...monthTotals,
-      balance: monthTotals.totalIncome - monthTotals.totalExpenses,
-    })
-  }
+      balance: month.totalIncome - month.totalExpenses, // Old balance calculation for compatibility
+    }
+  })
 
   // Calculate progress percentages
-  const incomeProgress = yearGoals ? (annualTotals.totalIncome / yearGoals.expectedProfit) * 100 : 0
-  const expenseProgress = yearGoals ? (annualTotals.totalExpenses / (yearGoals.monthlyBudget * 12)) * 100 : 0
-  const savingsProgress = yearGoals ? (annualTotals.totalSavings / yearGoals.emergencyReserve) * 100 : 0
-  const investmentProgress = yearGoals ? (annualTotals.totalInvestments / yearGoals.plannedInvestments) * 100 : 0
+  const incomeProgress = yearGoals ? (annualData.totalIncome / yearGoals.expectedProfit) * 100 : 0
+  const expenseProgress = yearGoals ? (annualData.totalExpenses / (yearGoals.monthlyBudget * 12)) * 100 : 0
+  const savingsProgress = yearGoals ? (annualData.totalSavings / yearGoals.emergencyReserve) * 100 : 0
+  const investmentProgress = yearGoals ? (annualData.totalInvestments / yearGoals.plannedInvestments) * 100 : 0
 
   return (
     <div className="space-y-6">
@@ -133,21 +74,22 @@ export function AnnualView() {
         <CardHeader className="pb-3">
           <CardTitle className="text-lg flex items-center gap-2">
             <Calendar className="h-5 w-5" />
-            Saldo Anual {selectedYear}
+            Saldo Líquido Anual {selectedYear}
           </CardTitle>
         </CardHeader>
         <CardContent>
           <div className="flex items-center gap-2">
-            <span className={`text-2xl font-bold ${annualBalance >= 0 ? "text-chart-3" : "text-destructive"}`}>
-              {formatCurrency(annualBalance)}
+            <span className={`text-2xl font-bold ${annualData.netBalance >= 0 ? "text-chart-3" : "text-destructive"}`}>
+              {formatCurrency(annualData.netBalance)}
             </span>
-            {annualBalance >= 0 ? (
+            {annualData.netBalance >= 0 ? (
               <TrendingUp className="h-5 w-5 text-chart-3" />
             ) : (
               <TrendingDown className="h-5 w-5 text-destructive" />
             )}
           </div>
-          <p className="text-sm text-muted-foreground mt-1">{yearTransactions.length} transações registradas</p>
+          <p className="text-sm text-muted-foreground mt-1">{annualData.transactions.length} transações registradas</p>
+          <p className="text-xs text-muted-foreground mt-1">Receitas - Gastos - Poupança - Investimentos</p>
         </CardContent>
       </Card>
 
@@ -158,7 +100,7 @@ export function AnnualView() {
             <CardTitle className="text-sm text-muted-foreground">Receitas Anuais</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-semibold text-chart-3">{formatCurrency(annualTotals.totalIncome)}</p>
+            <p className="text-xl font-semibold text-chart-3">{formatCurrency(annualData.totalIncome)}</p>
           </CardContent>
         </Card>
 
@@ -167,7 +109,7 @@ export function AnnualView() {
             <CardTitle className="text-sm text-muted-foreground">Gastos Anuais</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-semibold text-destructive">{formatCurrency(annualTotals.totalExpenses)}</p>
+            <p className="text-xl font-semibold text-destructive">{formatCurrency(annualData.totalExpenses)}</p>
           </CardContent>
         </Card>
 
@@ -176,7 +118,7 @@ export function AnnualView() {
             <CardTitle className="text-sm text-muted-foreground">Poupança Anual</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-semibold text-chart-1">{formatCurrency(annualTotals.totalSavings)}</p>
+            <p className="text-xl font-semibold text-chart-1">{formatCurrency(annualData.totalSavings)}</p>
           </CardContent>
         </Card>
 
@@ -185,7 +127,7 @@ export function AnnualView() {
             <CardTitle className="text-sm text-muted-foreground">Investimentos Anuais</CardTitle>
           </CardHeader>
           <CardContent>
-            <p className="text-xl font-semibold text-chart-4">{formatCurrency(annualTotals.totalInvestments)}</p>
+            <p className="text-xl font-semibold text-chart-4">{formatCurrency(annualData.totalInvestments)}</p>
           </CardContent>
         </Card>
       </div>
@@ -202,12 +144,12 @@ export function AnnualView() {
           <CardContent className="space-y-4">
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Lucro Esperado</span>
+                <span>Receitas Anuais</span>
                 <span>{Math.round(incomeProgress)}%</span>
               </div>
               <Progress value={Math.min(incomeProgress, 100)} className="h-2" />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Atual: {formatCurrency(annualTotals.totalIncome)}</span>
+                <span>Atual: {formatCurrency(annualData.totalIncome)}</span>
                 <span>Meta: {formatCurrency(yearGoals.expectedProfit)}</span>
               </div>
             </div>
@@ -219,19 +161,19 @@ export function AnnualView() {
               </div>
               <Progress value={Math.min(expenseProgress, 100)} className="h-2" />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Atual: {formatCurrency(annualTotals.totalExpenses)}</span>
+                <span>Atual: {formatCurrency(annualData.totalExpenses)}</span>
                 <span>Limite: {formatCurrency(yearGoals.monthlyBudget * 12)}</span>
               </div>
             </div>
 
             <div>
               <div className="flex justify-between text-sm mb-2">
-                <span>Reserva de Emergência</span>
+                <span>Poupança Anual</span>
                 <span>{Math.round(savingsProgress)}%</span>
               </div>
               <Progress value={Math.min(savingsProgress, 100)} className="h-2" />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Atual: {formatCurrency(annualTotals.totalSavings)}</span>
+                <span>Atual: {formatCurrency(annualData.totalSavings)}</span>
                 <span>Meta: {formatCurrency(yearGoals.emergencyReserve)}</span>
               </div>
             </div>
@@ -243,7 +185,7 @@ export function AnnualView() {
               </div>
               <Progress value={Math.min(investmentProgress, 100)} className="h-2" />
               <div className="flex justify-between text-xs text-muted-foreground mt-1">
-                <span>Atual: {formatCurrency(annualTotals.totalInvestments)}</span>
+                <span>Atual: {formatCurrency(annualData.totalInvestments)}</span>
                 <span>Meta: {formatCurrency(yearGoals.plannedInvestments)}</span>
               </div>
             </div>
@@ -260,7 +202,7 @@ export function AnnualView() {
           {yearGoals ? (
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <span>Lucro Esperado:</span>
+                <span>Receitas Anuais Esperadas:</span>
                 <div className="text-right">
                   <span className="font-semibold">{formatCurrency(yearGoals.expectedProfit)}</span>
                   <Badge variant={incomeProgress >= 100 ? "default" : "secondary"} className="ml-2 text-xs">
@@ -278,7 +220,7 @@ export function AnnualView() {
                 </div>
               </div>
               <div className="flex justify-between items-center">
-                <span>Reserva de Emergência:</span>
+                <span>Meta de Poupança Anual:</span>
                 <div className="text-right">
                   <span className="font-semibold">{formatCurrency(yearGoals.emergencyReserve)}</span>
                   <Badge variant={savingsProgress >= 100 ? "default" : "secondary"} className="ml-2 text-xs">
@@ -287,7 +229,7 @@ export function AnnualView() {
                 </div>
               </div>
               <div className="flex justify-between items-center">
-                <span>Investimentos Planejados:</span>
+                <span>Meta de Investimentos Anuais:</span>
                 <div className="text-right">
                   <span className="font-semibold">{formatCurrency(yearGoals.plannedInvestments)}</span>
                   <Badge variant={investmentProgress >= 100 ? "default" : "secondary"} className="ml-2 text-xs">
@@ -307,7 +249,7 @@ export function AnnualView() {
         <CardHeader>
           <CardTitle className="text-lg flex items-center gap-2">
             <BarChart3 className="h-5 w-5" />
-            Breakdown Mensal
+            Resumo Mensal do Ano {selectedYear}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -324,9 +266,12 @@ export function AnnualView() {
                 <div key={month.month} className="border rounded-lg p-3">
                   <div className="flex justify-between items-center mb-2">
                     <h4 className="font-medium">{month.monthName}</h4>
-                    <span className={`font-semibold ${month.balance >= 0 ? "text-chart-3" : "text-destructive"}`}>
-                      {formatCurrency(month.balance)}
-                    </span>
+                    <div className="text-right">
+                      <span className={`font-semibold ${month.netBalance >= 0 ? "text-chart-3" : "text-destructive"}`}>
+                        {formatCurrency(month.netBalance)}
+                      </span>
+                      <p className="text-xs text-muted-foreground">Saldo Líquido</p>
+                    </div>
                   </div>
                   <div className="grid grid-cols-2 gap-2 text-sm">
                     <div className="flex justify-between">
