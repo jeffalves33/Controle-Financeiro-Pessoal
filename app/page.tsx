@@ -8,7 +8,7 @@ import { Badge } from "@/components/ui/badge"
 import { Progress } from "@/components/ui/progress"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { useFinanceData } from "@/hooks/use-finance-data"
-import { formatCurrency, formatMonthYear, getMonthOptions } from "@/lib/finance-utils"
+import { formatCurrency, formatMonthYear } from "@/lib/finance-utils"
 import { GoalsModal } from "@/components/goals-modal"
 import { TransactionModal } from "@/components/transaction-modal"
 import { TransactionsList } from "@/components/transactions-list"
@@ -17,9 +17,30 @@ import { AuthWrapper } from "@/components/auth-wrapper"
 import { TrendingUp, TrendingDown, DollarSign, PiggyBank, Target, Plus, List, Calendar } from "lucide-react"
 
 function FinanceDashboard() {
-  const { data, isLoading, getMonthlyData, getGoalsForYear, getCurrentMonth, getCurrentYear } = useFinanceData()
+  const {
+    data,
+    isLoading,
+    getMonthlyData,
+    getGoalsForYear,
+    getCurrentMonth,
+    getCurrentYear,
+    getMonthsWithData,
+    getYearsWithData,
+  } = useFinanceData()
 
-  const [selectedMonth, setSelectedMonth] = useState(getCurrentMonth())
+  const monthsWithData = getMonthsWithData()
+  const yearsWithData = getYearsWithData()
+
+  const [selectedMonth, setSelectedMonth] = useState(() => {
+    const currentMonth = getCurrentMonth()
+    return monthsWithData.includes(currentMonth) ? currentMonth : monthsWithData[0] || currentMonth
+  })
+
+  const [selectedYear, setSelectedYear] = useState(() => {
+    const currentYear = getCurrentYear()
+    return yearsWithData.includes(currentYear) ? currentYear : yearsWithData[0] || currentYear
+  })
+
   const [view, setView] = useState<"monthly" | "annual">("monthly")
   const [activeTab, setActiveTab] = useState("dashboard")
 
@@ -35,9 +56,7 @@ function FinanceDashboard() {
   }
 
   const monthlyData = getMonthlyData(selectedMonth)
-  const currentYear = getCurrentYear()
-  const yearGoals = getGoalsForYear(currentYear)
-  const monthOptions = getMonthOptions()
+  const yearGoals = getGoalsForYear(view === "monthly" ? getCurrentYear() : selectedYear)
 
   const balance =
     monthlyData.totalIncome - monthlyData.totalExpenses - monthlyData.totalSavings - monthlyData.totalInvestments
@@ -105,18 +124,42 @@ function FinanceDashboard() {
                   </Button>
                 </div>
 
-                {/* Month Selector */}
-                {view === "monthly" && (
+                {/* Month/Year Selector */}
+                {view === "monthly" ? (
                   <Select value={selectedMonth} onValueChange={setSelectedMonth}>
                     <SelectTrigger className="w-full h-12">
                       <SelectValue placeholder="Selecione o mês" />
                     </SelectTrigger>
                     <SelectContent>
-                      {monthOptions.map((option) => (
-                        <SelectItem key={option.value} value={option.value}>
-                          {option.label}
-                        </SelectItem>
-                      ))}
+                      {monthsWithData.length > 0 ? (
+                        monthsWithData.map((month) => (
+                          <SelectItem key={month} value={month}>
+                            {formatMonthYear(month)}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value={getCurrentMonth()}>{formatMonthYear(getCurrentMonth())}</SelectItem>
+                      )}
+                    </SelectContent>
+                  </Select>
+                ) : (
+                  <Select
+                    value={selectedYear.toString()}
+                    onValueChange={(value) => setSelectedYear(Number.parseInt(value))}
+                  >
+                    <SelectTrigger className="w-full h-12">
+                      <SelectValue placeholder="Selecione o ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {yearsWithData.length > 0 ? (
+                        yearsWithData.map((year) => (
+                          <SelectItem key={year} value={year.toString()}>
+                            {year}
+                          </SelectItem>
+                        ))
+                      ) : (
+                        <SelectItem value={getCurrentYear().toString()}>{getCurrentYear()}</SelectItem>
+                      )}
                     </SelectContent>
                   </Select>
                 )}
@@ -305,7 +348,7 @@ function FinanceDashboard() {
               /* Annual View - Legacy simple view, now replaced by dedicated tab */
               <Card>
                 <CardHeader>
-                  <CardTitle className="text-lg">Metas Anuais {currentYear}</CardTitle>
+                  <CardTitle className="text-lg">Metas Anuais {selectedYear}</CardTitle>
                 </CardHeader>
                 <CardContent>
                   {yearGoals ? (
@@ -328,7 +371,7 @@ function FinanceDashboard() {
                       </div>
                     </div>
                   ) : (
-                    <p className="text-muted-foreground text-center py-4">Nenhuma meta definida para {currentYear}</p>
+                    <p className="text-muted-foreground text-center py-4">Nenhuma meta definida para {selectedYear}</p>
                   )}
                 </CardContent>
               </Card>

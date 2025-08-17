@@ -7,7 +7,21 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Badge } from "@/components/ui/badge"
 import { useFinanceData } from "@/hooks/use-finance-data"
 import { formatCurrency } from "@/lib/finance-utils"
-import { TrendingUp, TrendingDown, Target, Calendar, BarChart3 } from "lucide-react"
+import { TrendingUp, TrendingDown, Target, Calendar, BarChart3, LineChart } from "lucide-react"
+import {
+  LineChart as RechartsLineChart,
+  Line,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+  BarChart as RechartsBarChart,
+  Bar,
+  PieChart,
+  Pie,
+  Cell,
+} from "recharts"
 
 interface MonthlyBreakdown {
   month: string
@@ -20,14 +34,19 @@ interface MonthlyBreakdown {
   netBalance: number
 }
 
+const COLORS = {
+  income: "#10b981",
+  expense: "#ef4444",
+  savings: "#3b82f6",
+  investment: "#8b5cf6",
+}
+
 export function AnnualView() {
-  const { data, getGoalsForYear, getCurrentYear, getAnnualData, getMonthlyBreakdown } = useFinanceData()
+  const { data, getGoalsForYear, getCurrentYear, getAnnualData, getMonthlyBreakdown, getYearsWithData } =
+    useFinanceData()
   const [selectedYear, setSelectedYear] = useState(getCurrentYear())
 
-  // Get all available years from transactions
-  const availableYears = Array.from(new Set(data.transactions.map((t) => new Date(t.date).getFullYear()))).sort(
-    (a, b) => b - a,
-  )
+  const availableYears = getYearsWithData()
 
   if (availableYears.length === 0) {
     availableYears.push(getCurrentYear())
@@ -46,6 +65,22 @@ export function AnnualView() {
       balance: month.totalIncome - month.totalExpenses, // Old balance calculation for compatibility
     }
   })
+
+  const evolutionData = monthlyBreakdown.map((month) => ({
+    month: month.monthName,
+    receitas: month.totalIncome,
+    gastos: month.totalExpenses,
+    poupanca: month.totalSavings,
+    investimentos: month.totalInvestments,
+    saldoLiquido: month.netBalance,
+  }))
+
+  const distributionData = [
+    { name: "Receitas", value: annualData.totalIncome, color: COLORS.income },
+    { name: "Gastos", value: annualData.totalExpenses, color: COLORS.expense },
+    { name: "Poupança", value: annualData.totalSavings, color: COLORS.savings },
+    { name: "Investimentos", value: annualData.totalInvestments, color: COLORS.investment },
+  ].filter((item) => item.value > 0)
 
   // Calculate progress percentages
   const incomeProgress = yearGoals ? (annualData.totalIncome / yearGoals.expectedProfit) * 100 : 0
@@ -92,6 +127,121 @@ export function AnnualView() {
           <p className="text-xs text-muted-foreground mt-1">Receitas - Gastos - Poupança - Investimentos</p>
         </CardContent>
       </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="text-lg flex items-center gap-2">
+            <LineChart className="h-5 w-5" />
+            Evolução Mensal {selectedYear}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="h-64 w-full">
+            <ResponsiveContainer width="100%" height="100%">
+              <RechartsLineChart data={evolutionData}>
+                <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                <XAxis dataKey="month" className="text-xs" />
+                <YAxis className="text-xs" tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
+                <Tooltip
+                  formatter={(value: number) => [formatCurrency(value), ""]}
+                  labelClassName="text-foreground"
+                  contentStyle={{
+                    backgroundColor: "hsl(var(--background))",
+                    border: "1px solid hsl(var(--border))",
+                    borderRadius: "6px",
+                  }}
+                />
+                <Line type="monotone" dataKey="receitas" stroke={COLORS.income} strokeWidth={2} name="Receitas" />
+                <Line type="monotone" dataKey="gastos" stroke={COLORS.expense} strokeWidth={2} name="Gastos" />
+                <Line type="monotone" dataKey="poupanca" stroke={COLORS.savings} strokeWidth={2} name="Poupança" />
+                <Line
+                  type="monotone"
+                  dataKey="investimentos"
+                  stroke={COLORS.investment}
+                  strokeWidth={2}
+                  name="Investimentos"
+                />
+              </RechartsLineChart>
+            </ResponsiveContainer>
+          </div>
+        </CardContent>
+      </Card>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Distribuição Anual</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie
+                    data={distributionData}
+                    cx="50%"
+                    cy="50%"
+                    innerRadius={40}
+                    outerRadius={80}
+                    paddingAngle={5}
+                    dataKey="value"
+                  >
+                    {distributionData.map((entry, index) => (
+                      <Cell key={`cell-${index}`} fill={entry.color} />
+                    ))}
+                  </Pie>
+                  <Tooltip
+                    formatter={(value: number) => [formatCurrency(value), ""]}
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "6px",
+                    }}
+                  />
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+            <div className="grid grid-cols-2 gap-2 mt-4">
+              {distributionData.map((item) => (
+                <div key={item.name} className="flex items-center gap-2">
+                  <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.color }} />
+                  <span className="text-xs text-muted-foreground">{item.name}</span>
+                </div>
+              ))}
+            </div>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-lg">Saldo Líquido Mensal</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <div className="h-48 w-full">
+              <ResponsiveContainer width="100%" height="100%">
+                <RechartsBarChart data={evolutionData}>
+                  <CartesianGrid strokeDasharray="3 3" className="opacity-30" />
+                  <XAxis dataKey="month" className="text-xs" />
+                  <YAxis className="text-xs" tickFormatter={(value) => `R$ ${(value / 1000).toFixed(0)}k`} />
+                  <Tooltip
+                    formatter={(value: number) => [formatCurrency(value), "Saldo Líquido"]}
+                    labelClassName="text-foreground"
+                    contentStyle={{
+                      backgroundColor: "hsl(var(--background))",
+                      border: "1px solid hsl(var(--border))",
+                      borderRadius: "6px",
+                    }}
+                  />
+                  <Bar
+                    dataKey="saldoLiquido"
+                    fill={(data: any) => (data.saldoLiquido >= 0 ? COLORS.income : COLORS.expense)}
+                    radius={[4, 4, 0, 0]}
+                  />
+                </RechartsBarChart>
+              </ResponsiveContainer>
+            </div>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Annual Totals */}
       <div className="grid grid-cols-2 gap-4">

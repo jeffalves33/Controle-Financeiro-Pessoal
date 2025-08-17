@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useCallback } from "react"
 import { supabase } from "@/lib/supabase/client"
 import type { User } from "@supabase/supabase-js"
 import type { FinanceData, AnnualGoals, DailyTransaction, MonthlyData } from "@/types/finance"
@@ -16,6 +16,59 @@ export function useFinanceData() {
   const [data, setData] = useState<FinanceData>(defaultData)
   const [isLoading, setIsLoading] = useState(true)
   const [user, setUser] = useState<User | null>(null)
+
+  const loadData = useCallback(async () => {
+    if (!user) {
+      setIsLoading(false)
+      return
+    }
+
+    console.log("[v0] Loading finance data...")
+    try {
+      // Load goals
+      const { data: goalsData, error: goalsError } = await supabase
+        .from("goals")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("year", { ascending: false })
+
+      if (goalsError) throw goalsError
+
+      // Load transactions
+      const { data: transactionsData, error: transactionsError } = await supabase
+        .from("transactions")
+        .select("*")
+        .eq("user_id", user.id)
+        .order("date", { ascending: false })
+
+      if (transactionsError) throw transactionsError
+
+      // Transform data to match existing types
+      const goals: AnnualGoals[] = (goalsData || []).map((goal) => ({
+        year: goal.year,
+        expectedProfit: goal.annual_income,
+        monthlyBudget: goal.monthly_budget,
+        emergencyReserve: goal.emergency_reserve,
+        plannedInvestments: goal.planned_investments,
+      }))
+
+      const transactions: DailyTransaction[] = (transactionsData || []).map((transaction) => ({
+        id: transaction.id,
+        type: transaction.type,
+        amount: transaction.amount,
+        description: transaction.description || "",
+        category: transaction.category || "",
+        date: transaction.date,
+      }))
+
+      console.log("[v0] Data loaded:", { goals: goals.length, transactions: transactions.length })
+      setData({ goals, transactions })
+    } catch (error) {
+      console.error("Error loading finance data:", error)
+    } finally {
+      setIsLoading(false)
+    }
+  }, [user])
 
   // Load data from localStorage on mount
   useEffect(() => {
@@ -38,59 +91,44 @@ export function useFinanceData() {
   }, [])
 
   useEffect(() => {
-    if (!user) {
-      setIsLoading(false)
-      return
-    }
-
-    const loadData = async () => {
-      try {
-        // Load goals
-        const { data: goalsData, error: goalsError } = await supabase
-          .from("goals")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("year", { ascending: false })
-
-        if (goalsError) throw goalsError
-
-        // Load transactions
-        const { data: transactionsData, error: transactionsError } = await supabase
-          .from("transactions")
-          .select("*")
-          .eq("user_id", user.id)
-          .order("date", { ascending: false })
-
-        if (transactionsError) throw transactionsError
-
-        // Transform data to match existing types
-        const goals: AnnualGoals[] = (goalsData || []).map((goal) => ({
-          year: goal.year,
-          expectedProfit: goal.annual_income,
-          monthlyBudget: goal.monthly_budget,
-          emergencyReserve: goal.emergency_reserve,
-          plannedInvestments: goal.planned_investments,
-        }))
-
-        const transactions: DailyTransaction[] = (transactionsData || []).map((transaction) => ({
-          id: transaction.id,
-          type: transaction.type,
-          amount: transaction.amount,
-          description: transaction.description || "",
-          category: transaction.category || "",
-          date: transaction.date,
-        }))
-
-        setData({ goals, transactions })
-      } catch (error) {
-        console.error("Error loading finance data:", error)
-      } finally {
-        setIsLoading(false)
-      }
-    }
-
     loadData()
-  }, [user])
+  }, [loadData])
+
+  useEffect(() => {
+    if (!user) return
+
+    console.log("[v0] Setting up subscriptions for user:", user.id)
+
+    const goalsSubscription = supabase
+      .channel(`goals_changes_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "goals", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          console.log("[v0] Goals changed:", payload)
+          loadData()
+        },
+      )
+      .subscribe()
+
+    const transactionsSubscription = supabase
+      .channel(`transactions_changes_${user.id}`)
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "transactions", filter: `user_id=eq.${user.id}` },
+        (payload) => {
+          console.log("[v0] Transactions changed:", payload)
+          loadData()
+        },
+      )
+      .subscribe()
+
+    return () => {
+      console.log("[v0] Unsubscribing from channels")
+      goalsSubscription.unsubscribe()
+      transactionsSubscription.unsubscribe()
+    }
+  }, [user, loadData])
 
   // Save data to localStorage whenever data changes
   useEffect(() => {
@@ -119,17 +157,7 @@ export function useFinanceData() {
 
       if (error) throw error
 
-      // Update local state
-      setData((prev) => {
-        const existingIndex = prev.goals.findIndex((g) => g.year === goals.year)
-        if (existingIndex >= 0) {
-          const newGoals = [...prev.goals]
-          newGoals[existingIndex] = goals
-          return { ...prev, goals: newGoals }
-        } else {
-          return { ...prev, goals: [...prev.goals, goals] }
-        }
-      })
+      // Data will be updated automatically via subscription
     } catch (error) {
       console.error("Error saving goals:", error)
     }
@@ -138,36 +166,24 @@ export function useFinanceData() {
   const addTransaction = async (transaction: Omit<DailyTransaction, "id">) => {
     if (!user) return
 
+    console.log("[v0] Adding transaction:", transaction)
     try {
-      const { data: newTransaction, error } = await supabase
-        .from("transactions")
-        .insert({
-          user_id: user.id,
-          type: transaction.type,
-          amount: transaction.amount,
-          description: transaction.description,
-          category: transaction.category,
-          date: transaction.date,
-        })
-        .select()
-        .single()
+      const { error } = await supabase.from("transactions").insert({
+        user_id: user.id,
+        type: transaction.type,
+        amount: transaction.amount,
+        description: transaction.description,
+        category: transaction.category,
+        date: transaction.date,
+      })
 
       if (error) throw error
+      console.log("[v0] Transaction added successfully")
 
-      // Update local state
-      const formattedTransaction: DailyTransaction = {
-        id: newTransaction.id,
-        type: newTransaction.type,
-        amount: newTransaction.amount,
-        description: newTransaction.description || "",
-        category: newTransaction.category || "",
-        date: newTransaction.date,
-      }
-
-      setData((prev) => ({
-        ...prev,
-        transactions: [...prev.transactions, formattedTransaction],
-      }))
+      // Force refresh after a short delay to ensure data is updated
+      setTimeout(() => {
+        loadData()
+      }, 500)
     } catch (error) {
       console.error("Error adding transaction:", error)
     }
@@ -192,11 +208,7 @@ export function useFinanceData() {
 
       if (error) throw error
 
-      // Update local state
-      setData((prev) => ({
-        ...prev,
-        transactions: prev.transactions.map((t) => (t.id === id ? { ...t, ...updates } : t)),
-      }))
+      // Data will be updated automatically via subscription
     } catch (error) {
       console.error("Error updating transaction:", error)
     }
@@ -210,11 +222,7 @@ export function useFinanceData() {
 
       if (error) throw error
 
-      // Update local state
-      setData((prev) => ({
-        ...prev,
-        transactions: prev.transactions.filter((t) => t.id !== id),
-      }))
+      // Data will be updated automatically via subscription
     } catch (error) {
       console.error("Error deleting transaction:", error)
     }
@@ -314,6 +322,27 @@ export function useFinanceData() {
     return months
   }
 
+  const getMonthsWithData = (): string[] => {
+    const monthsSet = new Set<string>()
+    data.transactions.forEach((transaction) => {
+      const month = transaction.date.substring(0, 7) // YYYY-MM
+      monthsSet.add(month)
+    })
+    return Array.from(monthsSet).sort().reverse()
+  }
+
+  const getYearsWithData = (): number[] => {
+    const yearsSet = new Set<number>()
+    data.transactions.forEach((transaction) => {
+      const year = Number.parseInt(transaction.date.substring(0, 4))
+      yearsSet.add(year)
+    })
+    data.goals.forEach((goal) => {
+      yearsSet.add(goal.year)
+    })
+    return Array.from(yearsSet).sort().reverse()
+  }
+
   const getCurrentMonth = (): string => {
     const now = new Date()
     return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}`
@@ -337,5 +366,8 @@ export function useFinanceData() {
     getCurrentYear,
     getAnnualData,
     getMonthlyBreakdown,
+    getMonthsWithData,
+    getYearsWithData,
+    refreshData: loadData,
   }
 }
