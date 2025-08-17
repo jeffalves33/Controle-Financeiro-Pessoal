@@ -69,109 +69,93 @@ function FinanceDashboard() {
 
   return (
     <div className="min-h-screen bg-background">
-      {/* Header */}
-      <div className="bg-card border-b border-border px-4 py-4 sticky top-0 z-50">
+      <div className="bg-card border-b border-border px-4 py-3 sticky top-0 z-50 shadow-sm">
         <div className="max-w-md mx-auto">
-          <h1 className="text-xl sm:text-2xl font-bold text-foreground mb-4 text-center">Controle Financeiro</h1>
+          <h1 className="text-lg font-bold text-foreground mb-3 text-center">Controle Financeiro</h1>
 
           <Tabs value={activeTab} onValueChange={setActiveTab} className="w-full">
-            <TabsList className="grid w-full grid-cols-3 h-12">
-              <TabsTrigger
-                value="dashboard"
-                className="flex flex-col items-center gap-1 text-xs sm:flex-row sm:gap-2 sm:text-sm"
-              >
-                <DollarSign className="h-4 w-4" />
-                <span className="hidden sm:inline">Dashboard</span>
-                <span className="sm:hidden">Home</span>
+            <TabsList className="grid w-full grid-cols-3 h-10">
+              <TabsTrigger value="dashboard" className="flex items-center gap-1 text-xs">
+                <DollarSign className="h-3 w-3" />
+                <span>Dashboard</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="transactions"
-                className="flex flex-col items-center gap-1 text-xs sm:flex-row sm:gap-2 sm:text-sm"
-              >
-                <List className="h-4 w-4" />
-                <span className="hidden sm:inline">Transações</span>
-                <span className="sm:hidden">Lista</span>
+              <TabsTrigger value="transactions" className="flex items-center gap-1 text-xs">
+                <List className="h-3 w-3" />
+                <span>Transações</span>
               </TabsTrigger>
-              <TabsTrigger
-                value="annual"
-                className="flex flex-col items-center gap-1 text-xs sm:flex-row sm:gap-2 sm:text-sm"
-              >
-                <Calendar className="h-4 w-4" />
-                <span className="hidden sm:inline">Anual</span>
-                <span className="sm:hidden">Ano</span>
+              <TabsTrigger value="annual" className="flex items-center gap-1 text-xs">
+                <Calendar className="h-3 w-3" />
+                <span>Anual</span>
               </TabsTrigger>
             </TabsList>
-
-            {activeTab === "dashboard" && (
-              <div className="mt-4">
-                {/* View Toggle */}
-                <div className="flex gap-2 mb-4">
-                  <Button
-                    variant={view === "monthly" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setView("monthly")}
-                    className="flex-1 h-10"
-                  >
-                    Mensal
-                  </Button>
-                  <Button
-                    variant={view === "annual" ? "default" : "outline"}
-                    size="sm"
-                    onClick={() => setView("annual")}
-                    className="flex-1 h-10"
-                  >
-                    Anual
-                  </Button>
-                </div>
-
-                {/* Month/Year Selector */}
-                {view === "monthly" ? (
-                  <Select value={selectedMonth} onValueChange={setSelectedMonth}>
-                    <SelectTrigger className="w-full h-12">
-                      <SelectValue placeholder="Selecione o mês" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {monthsWithData.length > 0 ? (
-                        monthsWithData.map((month) => (
-                          <SelectItem key={month} value={month}>
-                            {formatMonthYear(month)}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value={getCurrentMonth()}>{formatMonthYear(getCurrentMonth())}</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                ) : (
-                  <Select
-                    value={selectedYear.toString()}
-                    onValueChange={(value) => setSelectedYear(Number.parseInt(value))}
-                  >
-                    <SelectTrigger className="w-full h-12">
-                      <SelectValue placeholder="Selecione o ano" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {yearsWithData.length > 0 ? (
-                        yearsWithData.map((year) => (
-                          <SelectItem key={year} value={year.toString()}>
-                            {year}
-                          </SelectItem>
-                        ))
-                      ) : (
-                        <SelectItem value={getCurrentYear().toString()}>{getCurrentYear()}</SelectItem>
-                      )}
-                    </SelectContent>
-                  </Select>
-                )}
-              </div>
-            )}
           </Tabs>
         </div>
       </div>
 
-      <div className="max-w-md mx-auto px-4 py-4 pb-24">
+      <div className="max-w-md mx-auto px-4 py-4 pb-20">
         {activeTab === "dashboard" && (
           <div className="space-y-4">
+            <div className="space-y-3">
+              <div className="flex gap-2">
+                <Button
+                  variant={view === "monthly" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setView("monthly")}
+                  className="flex-1 h-9"
+                >
+                  Mensal
+                </Button>
+                <Button
+                  variant={view === "annual" ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setView("annual")}
+                  className="flex-1 h-9"
+                >
+                  Anual
+                </Button>
+              </div>
+
+              {/* Month/Year Selector */}
+              {view === "monthly" ? (
+                <Select value={selectedMonth} onValueChange={setSelectedMonth}>
+                  <SelectTrigger className="w-full h-10">
+                    <SelectValue placeholder="Selecione o mês" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {monthsWithData.length > 0 ? (
+                      monthsWithData.map((month) => (
+                        <SelectItem key={month} value={month}>
+                          {formatMonthYear(month)}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value={getCurrentMonth()}>{formatMonthYear(getCurrentMonth())}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              ) : (
+                <Select
+                  value={selectedYear.toString()}
+                  onValueChange={(value) => setSelectedYear(Number.parseInt(value))}
+                >
+                  <SelectTrigger className="w-full h-10">
+                    <SelectValue placeholder="Selecione o ano" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {yearsWithData.length > 0 ? (
+                      yearsWithData.map((year) => (
+                        <SelectItem key={year} value={year.toString()}>
+                          {year}
+                        </SelectItem>
+                      ))
+                    ) : (
+                      <SelectItem value={getCurrentYear().toString()}>{getCurrentYear()}</SelectItem>
+                    )}
+                  </SelectContent>
+                </Select>
+              )}
+            </div>
+
             {view === "monthly" ? (
               <>
                 {/* Balance Card */}
@@ -314,15 +298,14 @@ function FinanceDashboard() {
                               </div>
                               <div className="text-right ml-2">
                                 <p
-                                  className={`font-semibold text-sm ${
-                                    transaction.type === "income"
+                                  className={`font-semibold text-sm ${transaction.type === "income"
                                       ? "text-chart-3"
                                       : transaction.type === "expense"
                                         ? "text-destructive"
                                         : transaction.type === "savings"
                                           ? "text-chart-1"
                                           : "text-chart-4"
-                                  }`}
+                                    }`}
                                 >
                                   {transaction.type === "income" ? "+" : "-"}
                                   {formatCurrency(transaction.amount)}
@@ -384,16 +367,16 @@ function FinanceDashboard() {
       </div>
 
       <div className="fixed bottom-4 left-1/2 transform -translate-x-1/2 z-50">
-        <div className="flex gap-3 px-4">
+        <div className="flex gap-2 px-4">
           <TransactionModal>
-            <Button size="lg" className="h-14 px-6 shadow-lg">
-              <Plus className="h-5 w-5 mr-2" />
+            <Button size="default" className="h-12 px-4 shadow-lg">
+              <Plus className="h-4 w-4 mr-2" />
               Nova Transação
             </Button>
           </TransactionModal>
           <GoalsModal>
-            <Button variant="outline" size="lg" className="h-14 px-6 bg-background shadow-lg">
-              <PiggyBank className="h-5 w-5 mr-2" />
+            <Button variant="outline" size="default" className="h-12 px-4 bg-background shadow-lg">
+              <PiggyBank className="h-4 w-4 mr-2" />
               Metas
             </Button>
           </GoalsModal>

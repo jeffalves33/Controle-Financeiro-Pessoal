@@ -83,7 +83,7 @@ export function EditTransactionModal({ transaction, onClose }: EditTransactionMo
 
   return (
     <Dialog open={true} onOpenChange={onClose}>
-      <DialogContent className="sm:max-w-md mx-4">
+      <DialogContent className="w-[95vw] max-w-md mx-auto my-8 max-h-[90vh] overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <Edit3 className="h-5 w-5" />
@@ -166,14 +166,14 @@ export function EditTransactionModal({ transaction, onClose }: EditTransactionMo
           <div className="bg-muted/50 rounded-lg p-3 border">
             <h4 className="font-medium mb-2">Preview da Transação:</h4>
             <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">{formData.description || "Descrição"}</p>
+              <div className="flex-1 min-w-0">
+                <p className="font-medium truncate">{formData.description || "Descrição"}</p>
                 <p className="text-sm text-muted-foreground">
                   {getTypeLabel(formData.type)}
                   {formData.category && ` • ${formData.category}`}
                 </p>
               </div>
-              <div className="text-right">
+              <div className="text-right ml-2">
                 <p className={`font-semibold ${getTypeColor(formData.type)}`}>
                   {formData.type === "income" ? "+" : "-"}
                   {formatCurrency(Number.parseFloat(formData.amount) || 0)}
